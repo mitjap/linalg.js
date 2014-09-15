@@ -6,8 +6,10 @@ See:
  
  <http://eigen.tuxfamily.org/dox/TopicLazyEvaluation.html>
  
+ <http://eigen.tuxfamily.org/dox/TopicInsideEigenExample.html>
+
  <http://eigen.tuxfamily.org/dox/group__DenseMatrixManipulation__chapter.html>
- 
+
  <http://eigen.tuxfamily.org/dox/AsciiQuickReference.txt>
 
 ####Implemented features:
@@ -16,7 +18,10 @@ See:
  - copy on write (copy underlying data only when it's being modified)
  
 ####Yet to be implemented features: 
-- reductions (rowwise/colwise, max/min, prod, sum, trace, all, any)
+ - reductions (rowwise/colwise, max/min, prod, sum, trace, all, any)
+ - iterations
+ - matrix decompositions (LU, SVD, QR, RQ)
+ - geometry (planes, lines)
 
 
 ### Matrix interface is defined like this:
@@ -37,5 +42,42 @@ __Properties:__
  - element-wise multiplication/division
  - matrix-multiplication, rowwise, colwise
  - inverse, SVD, ...
+
+### Eigen's class hieararchy
+```
+ MatrixBase
+	|
+	+---Matrix
+	|
+	+---CwiseBinaryOp
+	|  +--cwiseEqual
+	|  +--cwiseMax
+	|  +--cwiseMin
+	|  +--cwiseNotEqual
+	|  +--cwiseProduct
+	|  +--cwiseQuotient
+	|  +--minus
+	|  +--plus
+	|  +--multiplication
+	|
+	+--+-CwiseUnaryOp
+	|  +--cwiseAbs
+	|  +--cwiseAbs2
+	|  +--cwiseEqual
+	|  +--cwiseInverse
+	|  +--cwiseSqrt
+	|  +--scalar-multiplication
+	|  +--scalar-division
+	|  +--scalar-addition
+	|  +--scalar-subtraction
+	|  +--scalar-clamp
+	|
+	+--+-CwiseNullaryOp
+	   +--Ones
+	   +--Zero
+	   +--Random
+	   +--Identity
+	   +--Constant
+```
 	
 	

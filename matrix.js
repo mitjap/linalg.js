@@ -182,7 +182,7 @@ BlockMatrix.prototype = new Matrix;
 BlockMatrix.prototype.at = function (row, col) {
     return this.m.at(this.startRow + row, this.startCol + col);
 }
-BlockMatrix.prototype.clear = function() {
+BlockMatrix.prototype.clean = function() {
     delete this.startRow;
     delete this.startCol;
 }
@@ -198,7 +198,7 @@ AddMatrix.prototype = new ReadOnlyMatrix;
 AddMatrix.prototype.at = function (row, col) {
     return this.left.at(row, col) + this.right.at(row, col);
 }
-AddMatrix.prototype.clear = function() {
+AddMatrix.prototype.clean = function() {
     delete this.left;
     delete this.right;
 }
