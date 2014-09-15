@@ -1,6 +1,6 @@
 # linalg.js
 
-This is simple javascript linear algebra library that can do many awesome things. Idea is to mimic [Eigen](http://eigen.tuxfamily.org)'s behavious and it's lazy evaluation.
+This is simple javascript linear algebra library that can do many awesome things. Idea is to mimic [Eigen](http://eigen.tuxfamily.org)'s behaviour and it's lazy evaluation.
 
 See:
  
@@ -27,8 +27,8 @@ __Methods:__
  - copy()
  
 __Properties:__
- - rows
- - cols
+ - rows: Integer
+ - cols: Integer
  
  
 ###  List of operations by time complexity:
