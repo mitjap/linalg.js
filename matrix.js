@@ -1,82 +1,95 @@
-function RowMajor(rows, cols, offset, innerStride, outerStride) {
-    this.firstDimension = rows;
-    this.secondDimension = cols;
-
-    this.offset = offset || 0;
-    this.innerStride = innerStride || 0;
-    this.outerStride = outerStride || 0;
+// row-major: firstDimension=row, secondDimension=col
+// col-major: firstDimension=col, secondDimension=row
+function Storage(data, firstDimension, secondDimension, stride) {
+	this.data = data;
+	this.firstDimension = firstDimension;
+	this.secondDimension = secondDimension;
+	
+	if (stride) {
+		console.log('in');
+		this.offset = stride.offset || 0;
+		this.strideInner = stride.inner || 0;
+		this.strideOuter = stride.outer || 0;
+		
+		this.get = this.getStride;
+	}
+}
+Storage.prototype.get = function (firstIndex, secondIndex) {
+    return firstIndex * this.secondDimension + secondIndex;
+}
+Storage.prototype.getStride = function (firstIndex, secondIndex) {
+    return this.offset + firstIndex * (this.secondDimension + this.strideOuter + this.strideInner * (this.secondDimension - 1)) + secondIndex * (this.strideInner + 1);
+}
+Storage.prototype.at = function (firstIndex, secondIndex) {
+	return this.data[this.get(firstIndex, secondIndex)];
+}
+Storage.prototype.set = function (firstIndex, secondIndex, value) {
+	this.data[this.get(firstIndex, secondIndex)] = value;
 }
 
+function RowMajor(data, rows, cols, stride) {
+	Storage.call(this, data, rows, cols, stride);
+}
+RowMajor.prototype = new Storage;
 RowMajor.prototype.get = function (row, col) {
-    return this.offset + row * (this.secondDimension + this.outerStride + this.innerStride * (this.secondDimension - 1)) + col * (this.innerStride + 1);
-};
-
-RowMajor.prototype.clean = function () {
-    return new RowMajor(this.firstDimension, this.secondDimension);
+	return Storage.prototype.get(this, row, col);
+}
+RowMajor.prototype.getStride = function (row, col) {
+	return Storage.prototype.getStride.call(this, row, col);
 }
 
-RowMajor.prototype.block = function (startRow, startCol, blockRows, blockCols) {
-    return new RowMajor(
-        blockRows, 
-        blockCols,
-        this.get(startRow, startCol),
-        this.innerStride,
-        this.outerStride + this.secondDimension - blockCols
-    );
+function ColMajor(data, rows, cols, stride) {
+	Storage.call(this, data, cols, rows, stride);
 }
-
-function ColMajor(rows, cols, offset, innerStride, outerStride) {
-    this.firstDimension = cols;
-    this.secondDimension = rows;
-
-    this.offset = offset || 0;
-    this.innerStride = innerStride || 0;
-    this.outerStride = outerStride || 0;
-}
-
-ColMajor.prototype = new RowMajor();
+ColMajor.prototype = new Storage;
 ColMajor.prototype.get = function (row, col) {
-    return RowMajor.prototype.get.call(this, col, row);
-};
-
-ColMajor.prototype.clean = function () {
-    return new ColMajor(this.firstDimension, this.secondDimension);
+	return Storage.prototype.get(this, col, row);
 }
-
-ColMajor.prototype.block = function (startRow, startCol, blockRows, blockCols) {
-    return new ColMajor(
-        blockRows, 
-        blockCols,
-        this.get(startRow, startCol),
-        this.innerStride,
-        this.outerStride + this.secondDimension - blockRows
-    );
+ColMajor.prototype.getStride = function (row, col) {
+	return Storage.prototype.getStride.call(this, col, row);
 }
-
-RowMajor.prototype.inverse = function () {
-    return new ColMajor(this.firstDimension, this.secondDimension, this.offset, this.innerStride, this.outerStride);
-};
-
-ColMajor.prototype.inverse = function () {
-    return new RowMajor(this.firstDimension, this.secondDimension, this.offset, this.innerStride, this.outerStride);
-};
 
 function Matrix() {}
 
-Matrix.Create = function(rows, cols, data, storageOrder) {
-    storageOrder = storageOrder || RowMajor;
+Matrix.Create = function(rows, cols, data, storage) {
+    storage = storage || RowMajor;
 
     var m = new Matrix();
     m.rows = rows;
     m.cols = cols;
-    m.data = data; 
-    m.storageOrder = storageOrder.firstDimension ? storageOrder : new storageOrder(rows, cols);
+    m.storage = storage.firstDimension ? storage : new storage(data, rows, cols);
     
     return m;
 }
 
 Matrix.Map = function(rows, cols, data, order, offset, innerStride, outerStride) {
-    return Matrix.Create(rows, cols, data, new order(rows, cols, offset, innerStride, outerStride));
+    return Matrix.Create(rows, cols, data, new order(data, rows, cols, {
+		'offset': offset, 
+		'inner': innerStride,
+		'outer': outerStride
+	}));
+}
+
+Matrix.prototype.at = function (row, col) {
+    return this.storage.at(row, col);
+}
+
+Matrix.prototype.set = function (row, col, val) {
+    //TODO: copy data on write if data is shared
+    this.storage.set(row, col, val);
+}
+
+/** Performs deep copy of matrix */ 
+Matrix.prototype.copy = function () {
+    var m = Matrix.Create(this.rows, this.cols, new Array(this.rows * this.cols),  this.storage.constructor);
+
+    for (var row = 0; row < this.rows; row++) {
+        for (var col = 0; col < this.cols; col++) {
+            m.set(row, col, this.at(row, col));
+        }
+    }
+    
+    return m;
 }
 
 Matrix.prototype.print = function () {
@@ -91,36 +104,12 @@ Matrix.prototype.print = function () {
     console.log(str);
 }
 
-Matrix.prototype.isSameSizeAs = function(other) {
-    return this.rows == other.rows && this.cols == other.cols;
+Matrix.prototype.isSameSizeAs = function (other) {
+    return this.rows === other.rows && this.cols === other.cols;
 }
-
-Matrix.prototype.at = function (row, col) {
-    return this.data[this.storageOrder.get(row, col)];
-}
-
-/*
-TODO: copy data on write if data is shared
-Matrix.prototype.set = function (row, col, val) {
-    this.data[this.storageOrder.get(row, col)] = val;
-}
-*/
 
 Matrix.prototype.transpose = function () {
     return new TransposedMatrix(this);
-}
-
-/** Performs deep copy of matrix */ 
-Matrix.prototype.copy = function () {
-    var m = Matrix.Create(this.rows, this.cols, new Array(this.rows * this.cols),  RowMajor);
-
-    for (var row = 0; row < this.rows; row++) {
-        for (var col = 0; col < this.cols; col++) {
-            m.data[m.storageOrder.get(row, col)] = this.at(row, col);
-        }
-    }
-    
-    return m;
 }
 
 Matrix.prototype.row = function (i) {
@@ -151,12 +140,32 @@ Matrix.prototype.subtract = function (other) {
     return new AddMatrix(this, other.negate());
 }
 
+function ReadOnlyMatrix() {}
+ReadOnlyMatrix.prototype = new Matrix;
+ReadOnlyMatrix.prototype.set = function (row, col, val) {
+    this.m = this.copy();
+    this.m.set(row, col, val);
+
+    // reset getter and setter functions
+    this.set = this._set;
+    this.at = this._at;
+	
+	this.clean();
+}
+ReadOnlyMatrix.prototype._at = function (row, col) {
+    return this.m.at(row, col);
+}
+ReadOnlyMatrix.prototype._set = function (row, col, val) {
+    this.m.set(row, col, val);
+}
+ReadOnlyMatrix.prototype.clean = function () { /* do nothing */ }
+
 function TransposedMatrix(m) {
     this.m = m;
     this.rows = m.cols;
     this.cols = m.rows;
 }
-TransposedMatrix.prototype = new Matrix;
+TransposedMatrix.prototype = new ReadOnlyMatrix;
 TransposedMatrix.prototype.at = function (row, col) {
     return this.m.at(col, row);
 }
@@ -165,7 +174,7 @@ function BlockMatrix(m, startRow, startCol, blockRows, blockCols) {
     this.m = m;
     this.rows = blockRows;
     this.cols = blockCols;
-    
+
     this.startRow = startRow;
     this.startCol = startCol;
 }
@@ -173,30 +182,34 @@ BlockMatrix.prototype = new Matrix;
 BlockMatrix.prototype.at = function (row, col) {
     return this.m.at(this.startRow + row, this.startCol + col);
 }
+BlockMatrix.prototype.clear = function() {
+    delete this.startRow;
+    delete this.startCol;
+}
 
 function AddMatrix(left, right) {
     this.left = left;
     this.right = right;
-    
+
     this.rows = left.rows;
     this.cols = left.cols;
 }
-AddMatrix.prototype = new Matrix;
+AddMatrix.prototype = new ReadOnlyMatrix;
 AddMatrix.prototype.at = function (row, col) {
     return this.left.at(row, col) + this.right.at(row, col);
+}
+AddMatrix.prototype.clear = function() {
+    delete this.left;
+    delete this.right;
 }
 
 function NegateMatrix(m) {
     this.m = m;
-    
+
     this.rows = m.rows;
     this.cols = m.cols;
 }
-NegateMatrix.prototype = new Matrix;
+NegateMatrix.prototype = new ReadOnlyMatrix;
 NegateMatrix.prototype.at = function (row, col) {
     return -this.m.at(row, col);
 }
-
-
-
-
