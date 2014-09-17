@@ -1,0 +1,23 @@
+{
+    "name": "linalg.js",
+    "description": "Linear algebra library",
+    "keywords": ["linear", "algebra", "eigen", "lazy", "evaluation", "matrix", "vector"],
+    "author": "Mitja Puzigaća <mitjap@gmail.com>",
+    "contributors": [],
+    "version": "0.1.0",
+    "license": "GPL-3.0",
+    "private": false,
+    "devDependencies": {
+        "mocha": "1.4.x",
+        "expect.js": "0.3.x"
+    },
+    "repository" : { 
+        "type" : "git",
+        "url" : "https://github.com/mitjap/linalg.js.git"
+    },
+    "bugs": {
+        "url": "https://github.com/mitjap/linalg.js/issues",
+        "email": "mitjap@gmail.com"
+    },
+    "engine": "node 0.4.1"
+}
