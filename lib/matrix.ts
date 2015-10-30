@@ -4,31 +4,31 @@ class MatrixStorage {
     public data: number[];
     public firstDimension: number;
     public secondDimension: number;
-    public stride: number;
-
+    
     private offset: number;
+    private stride: number;
     private strideInner: number;
     private strideOuter: number;
 
     constructor(data: number[], firstDimension: number, secondDimension: number, stride?: {offset: number, inner: number, outer: number}) {
-    	this.data = data;
-    	this.firstDimension = firstDimension;
-    	this.secondDimension = secondDimension;
-    	
-    	if (stride) {
-    		this.offset = stride.offset || 0;
-    		this.strideInner = stride.inner || 0; 
-    		this.strideOuter = stride.outer || 0;
-    		
-    		this.get = this.getStride;
-    	}
+        this.data = data;
+        this.firstDimension = firstDimension;
+        this.secondDimension = secondDimension;
+
+        if (stride) {
+            this.offset = stride.offset || 0;
+            this.strideInner = stride.inner || 0;
+            this.strideOuter = stride.outer || 0;
+
+            this.get = this.getStride;
+        }
     }
 
-    get(firstIndex, secondIndex) {
+    protected get(firstIndex, secondIndex) {
         return firstIndex * this.secondDimension + secondIndex;
     }
 
-    getStride(firstIndex, secondIndex) {
+    protected getStride(firstIndex, secondIndex) {
         return this.offset + firstIndex * (this.secondDimension + this.strideOuter + this.strideInner * (this.secondDimension - 1)) + secondIndex * (this.strideInner + 1);
     }
 
@@ -42,184 +42,254 @@ class MatrixStorage {
 }
 
 class RowMajor extends MatrixStorage {
-    constructor(data: number[], rows: number, cols: number, stride?: {offset: number, inner: number, outer: number}) {
+    constructor(data: number[], rows: number, cols: number, stride ?:any) {
         super(data, rows, cols, stride)
     }
 }
 
-function ColMajor(data, rows, cols, stride) {
-	MatrixStorage.call(this, data, cols, rows, stride);
-}
-ColMajor.prototype = new MatrixStorage;
-ColMajor.prototype.get = function (row, col) {
-	return MatrixStorage.prototype.get(this, col, row);
-}
-ColMajor.prototype.getStride = function (row, col) {
-	return MatrixStorage.prototype.getStride.call(this, col, row);
-}
+class ColMajor extends MatrixStorage {
 
-function Matrix() {}
-
-Matrix.Create = function(rows, cols, data, MatrixStorage) {
-    MatrixStorage = MatrixStorage || RowMajor;
-
-    var m = new Matrix();
-    m.rows = rows;
-    m.cols = cols;
-    m.MatrixStorage = MatrixStorage.firstDimension ? MatrixStorage : new MatrixStorage(data, rows, cols);
-    
-    return m;
-}
-
-Matrix.Map = function(rows, cols, data, order, offset, innerStride, outerStride) {
-    return Matrix.Create(rows, cols, data, new order(data, rows, cols, {
-		'offset': offset, 
-		'inner': innerStride,
-		'outer': outerStride
-	}));
-}
-
-Matrix.prototype.at = function (row, col) {
-    return this.MatrixStorage.at(row, col);
-}
-
-Matrix.prototype.set = function (row, col, val) {
-    //TODO: copy data on write if data is shared
-    this.MatrixStorage.set(row, col, val);
-}
-
-/** Performs deep copy of matrix */ 
-Matrix.prototype.copy = function () {
-    var m = Matrix.Create(this.rows, this.cols, new Array(this.rows * this.cols),  this.MatrixStorage.constructor);
-
-    for (var row = 0; row < this.rows; row++) {
-        for (var col = 0; col < this.cols; col++) {
-            m.set(row, col, this.at(row, col));
-        }
+    constructor(data: number[], rows: number, cols: number, stride ?: any) {
+        super(data, cols, rows, stride);
     }
-    
-    return m;
+
+    get(row, col) {
+        return super.get(col, row);
+    }
+
+    getStride(row, col) {
+        return super.getStride(col, row);
+    }
 }
 
-Matrix.prototype.print = function () {
+interface IMatrix {
+    rows(): number;
+    cols(): number;
+
+    at(row: number, col: number): number;
+    set(row: number, col: number, val: number);
+    copy(): IMatrix;
+    toString(): String;
+    isSameSizeAs(other: IMatrix): boolean;
+
+    transpose(): IMatrix;
+    block(startRow: number, startCol: number, blockRows: number, blockCols: number): IMatrix;
+    row(i: number): IMatrix;
+    col(i: number): IMatrix;
+    add(other: IMatrix): IMatrix;
+    subtract(other: IMatrix): IMatrix;
+    negate(): IMatrix;
+}
+
+abstract class MatrixBase implements IMatrix {
+  private _rows: number;
+  private _cols: number;
+
+  constructor(rows: number, cols: number) {
+    this._rows = rows;
+    this._cols = cols;
+  }
+
+  abstract at(row: number, col: number): number;
+  abstract set(row: number, col: number, value: number);
+
+  rows(): number {
+    return this._rows;
+  }
+
+  cols(): number {
+    return this._cols;
+  }
+  /**
+   * Performs deep copy of a matrix
+   */
+  copy() {
+    var data: number[] = new Array<number>(this.rows() * this.cols());
+    var m: IMatrix = Matrix.Create(this.rows(), this.cols(), new RowMajor(data, this.rows(), this.cols()));
+
+    for (var row = 0; row < this.rows(); row++) {
+      for (var col = 0; col < this.cols(); col++) {
+        m.set(row, col, this.at(row, col));
+      }
+    }
+
+    return m;
+  }
+
+  toString() {
     var str = new String;
-    for (var row = 0; row < this.rows; row++) {
-        for (var col = 0; col < this.cols; col++) {
-            str = str.concat(this.at(row, col) + ' ');
-        }
-        str = str.concat('\n');
+    for (var row = 0; row < this.rows(); row++) {
+      for (var col = 0; col < this.cols(); col++) {
+        str = str.concat(this.at(row, col) + ' ');
+      }
+      str = str.concat('\n');
     }
     str = str.concat('\n');
-    console.log(str);
-}
+    return str;
+  }
 
-Matrix.prototype.isSameSizeAs = function (other) {
+  isSameSizeAs(other: IMatrix) {
     return this.rows === other.rows && this.cols === other.cols;
-}
+  }
 
-Matrix.prototype.transpose = function () {
+  transpose() {
     return new TransposedMatrix(this);
-}
+  }
 
-Matrix.prototype.row = function (i) {
-    return this.block(i, 0, 1, this.cols);
-}
+  row(i: number) {
+    return this.block(i, 0, 1, this.cols());
+  }
 
-Matrix.prototype.col = function (i) {
-    return this.block(0, i, this.rows, 1);
-}
+  col(i: number) {
+    return this.block(0, i, this.rows(), 1);
+  }
 
-Matrix.prototype.block = function (startRow, startCol, blockRows, blockCols) {
-    return new BlockMatrix(this.m, startRow, startCol, blockRows, blockCols);
-}
+  block(startRow: number, startCol: number, blockRows: number, blockCols: number) {
+    return new BlockMatrix(this, startRow, startCol, blockRows, blockCols);
+  }
 
-Matrix.prototype.negate = function () {
+  negate() {
     return new NegateMatrix(this);
-}
+  }
 
-Matrix.prototype.add = function (other) {
-    if (!this.isSameSizeAs(other)) throw new MatrixException("Matrix not of same dimensions");
-    
+  add(other: IMatrix) {
+    if (!this.isSameSizeAs(other)) throw new Error("Matrices not of same dimensions");
+
     return new AddMatrix(this, other);
-}
+  }
 
-Matrix.prototype.subtract = function (other) {
-    if (!this.isSameSizeAs(other)) throw new MatrixException("Matrix not of same dimensions");
-    
+  subtract(other: IMatrix) {
+    if (!this.isSameSizeAs(other)) throw new Error("Matrices not of same dimensions");
+
     return new AddMatrix(this, other.negate());
+  }
 }
 
-function ReadOnlyMatrix() {}
-ReadOnlyMatrix.prototype = new Matrix;
-ReadOnlyMatrix.prototype.set = function (row, col, val) {
+class Matrix extends MatrixBase {
+
+    constructor(rows: number, cols: number, private storage: MatrixStorage) {
+    super(rows, cols)
+        this.storage = storage;
+    }
+
+    static Create(rows: number, cols: number, storage: MatrixStorage) {
+        return new Matrix(rows, cols, storage);
+    }
+
+    static Map(rows: number, cols: number, data: number[], order, offset: number, innerStride: number, outerStride: number) {
+        return Matrix.Create(rows, cols, new order(data, rows, cols, {
+            'offset': offset,
+            'inner': innerStride,
+            'outer': outerStride
+        }));
+    }
+
+
+    at(row: number, col: number) {
+        return this.storage.at(row, col);
+    }
+
+    set(row: number, col: number, val: number) {
+        this.storage.set(row, col, val);
+    }
+}
+
+abstract class MatrixOp extends MatrixBase {
+  set(row, col, val) {
+    throw new Error("Can not set on MatrixOp");
+  }
+}
+
+class ReadOnlyMatrix extends MatrixBase {
+
+  constructor(protected m: IMatrix) {
+    super(m.rows(), m.cols());
+    this.m = m;
+  }
+
+  set(row: number, col: number, val: number) {
     this.m = this.copy();
     this.m.set(row, col, val);
 
     // reset getter and setter functions
     this.set = this._set;
-    this.at = this._at;
-	
-	this.clean();
+  }
 
-}
-ReadOnlyMatrix.prototype._at = function (row, col) {
+  at(row: number, col: number) {
     return this.m.at(row, col);
-}
-ReadOnlyMatrix.prototype._set = function (row, col, val) {
+  }
+
+  private _set(row: number, col: number, val: number) {
     this.m.set(row, col, val);
-}
-ReadOnlyMatrix.prototype.clean = function () { /* do nothing */ }
+  }
 
-function TransposedMatrix(m) {
-    this.m = m;
-    this.rows = m.cols;
-    this.cols = m.rows;
 }
-TransposedMatrix.prototype = new ReadOnlyMatrix;
-TransposedMatrix.prototype.at = function (row, col) {
+class TransposedMatrix extends ReadOnlyMatrix {
+  rows() {
+    return this.m.cols();
+  }
+
+  cols() {
+    return this.m.cols();
+  }
+
+  at(row, col) {
     return this.m.at(col, row);
+  }
+
+  set(row, col, val) {
+    this.m.set(col, row, val);
+  }
 }
 
-function BlockMatrix(m, startRow, startCol, blockRows, blockCols) {
+class BlockMatrix extends MatrixBase {
+  constructor(protected m: IMatrix, private startRow: number, private startCol: number, private blockRows: number, private blockCols: number) {
+    super(m.rows(), m.cols());
     this.m = m;
-    this.rows = blockRows;
-    this.cols = blockCols;
+
+    this.blockRows = blockRows;
+    this.blockCols = blockCols;
 
     this.startRow = startRow;
     this.startCol = startCol;
-}
-BlockMatrix.prototype = new Matrix;
-BlockMatrix.prototype.at = function (row, col) {
+  }
+
+  rows() {
+    return this.blockRows;
+  }
+
+  cols() {
+    return this.blockCols;
+  }
+
+  at(row, col) {
     return this.m.at(this.startRow + row, this.startCol + col);
-}
-BlockMatrix.prototype.clean = function() {
-    delete this.startRow;
-    delete this.startCol;
+  }
+
+  set(row, col, val) {
+    this.m.set(this.startRow + row, this.startCol + col, val);
+  }
 }
 
-function AddMatrix(left, right) {
+class AddMatrix extends ReadOnlyMatrix {
+  constructor(protected left: IMatrix, protected right: IMatrix) {
+    super(new ReadOnlyMatrix(this));
+
     this.left = left;
     this.right = right;
+  }
 
-    this.rows = left.rows;
-    this.cols = left.cols;
-}
-AddMatrix.prototype = new ReadOnlyMatrix;
-AddMatrix.prototype.at = function (row, col) {
+  at(row, col) {
     return this.left.at(row, col) + this.right.at(row, col);
-}
-AddMatrix.prototype.clean = function() {
-    delete this.left;
-    delete this.right;
+  }
 }
 
-function NegateMatrix(m) {
-    this.m = m;
+class NeageteMatrix extends ReadOnlyMatrix {
+  constructor(m) {
+    super(m);
+  }
 
-    this.rows = m.rows;
-    this.cols = m.cols;
-}
-NegateMatrix.prototype = new ReadOnlyMatrix;
-NegateMatrix.prototype.at = function (row, col) {
+  at(row, col) {
     return -this.m.at(row, col);
+  }
 }
